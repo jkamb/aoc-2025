@@ -47,13 +47,17 @@ fn parse(input: []const u8, allocator: std.mem.Allocator) ![]Range {
     return ranges.toOwnedSlice(allocator);
 }
 
-fn isInvalid(n: u64) bool {
+fn isInvalid(n: u64, check_twice: bool) bool {
     var num = n;
     var digits: u32 = 0;
     while (num != 0) {
         num /= 10;
         digits += 1;
     }
+    return if (check_twice == true) checkTwice(n, digits) else checkTwiceOrMore(n, digits);
+}
+
+fn checkTwice(n: u64, digits: u32) bool {
     if (digits % 2 != 0) {
         return false;
     }
@@ -64,12 +68,30 @@ fn isInvalid(n: u64) bool {
     return left == right;
 }
 
+fn checkTwiceOrMore(n: u64, digits: u32) bool {
+    for (1..digits / 2 + 1) |k| {
+        if (digits % k != 0) {
+            continue;
+        }
+        const divisor = std.math.pow(u64, 10, digits - k);
+        const pattern = n / divisor;
+        var repeated: u64 = 0;
+        for (0..digits / k) |_| {
+            repeated = (repeated * std.math.pow(u64, 10, k)) + pattern;
+        }
+        if (repeated == n) {
+            return true;
+        }
+    }
+    return false;
+}
+
 fn part1(ranges: []Range) u64 {
     var result: u64 = 0;
     for (ranges) |r| {
         var it = rangeIterator(r);
         while (it.next()) |num| {
-            if (isInvalid(num)) {
+            if (isInvalid(num, true)) {
                 result += num;
             }
         }
@@ -77,8 +99,17 @@ fn part1(ranges: []Range) u64 {
     return result;
 }
 
-fn part2(_: []Range) u32 {
-    return 0;
+fn part2(ranges: []Range) u64 {
+    var result: u64 = 0;
+    for (ranges) |r| {
+        var it = rangeIterator(r);
+        while (it.next()) |num| {
+            if (isInvalid(num, false)) {
+                result += num;
+            }
+        }
+    }
+    return result;
 }
 
 const puzzle_input = @embedFile("day2input.txt");
@@ -98,10 +129,17 @@ pub fn main() !void {
 const test_input = "11-22,95-115,998-1012,1188511880-1188511890,222220-222224,1698522-1698528,446443-446449,38593856-38593862,565653-565659,824824821-824824827,2121212118-2121212124";
 
 test "test invalid" {
-    try std.testing.expect(isInvalid(11));
-    try std.testing.expect(!isInvalid(12));
-    try std.testing.expect(isInvalid(2323));
-    try std.testing.expect(isInvalid(1188511885));
+    try std.testing.expect(isInvalid(11, true));
+    try std.testing.expect(!isInvalid(12, true));
+    try std.testing.expect(isInvalid(2323, true));
+    try std.testing.expect(isInvalid(1188511885, true));
+}
+
+test "part 2" {
+    try std.testing.expect(isInvalid(12341234, false));
+    try std.testing.expect(isInvalid(123123123, false));
+    try std.testing.expect(isInvalid(1212121212, false));
+    try std.testing.expect(isInvalid(1111111, false));
 }
 
 test "test parse" {
@@ -118,10 +156,10 @@ test "test part1" {
     try std.testing.expectEqual(@as(u32, 1227775554), count);
 }
 
-// test "test part2" {
-//     const gpa = std.testing.allocator;
-//     const rotations = try parse(test_input, gpa);
-//     defer gpa.free(rotations);
-//     const count = part2(rotations);
-//     try std.testing.expectEqual(@as(u32, 6), count);
-// }
+test "test part2" {
+    const gpa = std.testing.allocator;
+    const ranges = try parse(test_input, gpa);
+    defer gpa.free(ranges);
+    const count = part2(ranges);
+    try std.testing.expectEqual(@as(u32, 4174379265), count);
+}
